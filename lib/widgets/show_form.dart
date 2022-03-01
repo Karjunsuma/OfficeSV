@@ -7,12 +7,14 @@ class Showform extends StatelessWidget {
   final String label;
   final IconData icondata;
   final bool? sccuText;
+  final Function(String) changeFunc;
 
   const Showform({
     Key? key,
     required this.label,
     required this.icondata,
     this.sccuText,
+    required this.changeFunc,
   }) : super(key: key);
 
   @override
@@ -21,8 +23,12 @@ class Showform extends StatelessWidget {
       margin: EdgeInsets.only(top: 16),
       width: 250,
       height: 40,
-      child: TextFormField(obscureText: sccuText ?? false,
+      child: TextFormField(
+        onChanged: changeFunc,
+        obscureText: sccuText ?? false,
         decoration: InputDecoration(
+          fillColor: Colors.white.withOpacity(0.5),
+          filled: true,
           contentPadding: EdgeInsets.symmetric(vertical: 4),
           prefixIcon: Icon(
             icondata,

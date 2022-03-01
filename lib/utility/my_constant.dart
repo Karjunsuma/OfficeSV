@@ -10,6 +10,11 @@ class MyConstant {
 
 //method
 
+BoxDecoration painBox() => BoxDecoration(
+  color: ligh.withOpacity(0.5),
+);
+
+
   TextStyle h1Style() => TextStyle(
         fontSize: 30,
         color: dark,
