@@ -9,6 +9,11 @@ class MyConstant {
   static Color ligh = const Color(0xffffa48c);
 
 //method
+BoxDecoration curBorder() => BoxDecoration(
+          border: Border.all(color: MyConstant.dark),
+          borderRadius: BorderRadius.circular(15));
+
+
 
 BoxDecoration painBox() => BoxDecoration(
   color: ligh.withOpacity(0.5),

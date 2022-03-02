@@ -19,7 +19,7 @@ class ShowButton extends StatelessWidget {
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(primary: MyConstant.primary),
         onPressed: pressFunc,
-        child: Text('Login'),
+        child: Text(label),
       ),
     );
   }
