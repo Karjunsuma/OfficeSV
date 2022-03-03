@@ -1,12 +1,17 @@
 import 'dart:io';
+import 'dart:math';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:officesv/utility/my_constant.dart';
+import 'package:officesv/utility/my_dialog.dart';
 import 'package:officesv/widgets/show_button.dart';
 import 'package:officesv/widgets/show_form.dart';
 import 'package:officesv/widgets/show_image.dart';
 import 'package:officesv/widgets/show_text.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AddJob extends StatefulWidget {
   const AddJob({
@@ -21,7 +26,7 @@ class _AddJobState extends State<AddJob> {
   var factorKeys = <int>[1, 2, 3, 4];
 
   int? chooseFactoryKey;
-  String? chooseAgree, addDate;
+  String? chooseAgree, addDate, jobName, detailJob, userLogin;
 
   var iTemChooses = <bool>[false, false, false];
 
@@ -34,8 +39,17 @@ class _AddJobState extends State<AddJob> {
   void initState() {
     dateTime = DateTime.now();
     super.initState();
+    setState(() {
+      addDate = dateFormat.format(dateTime!);
+    });
 
-    addDate = dateFormat.format(dateTime!);
+    findUser();
+  }
+
+  Future<void> findUser() async {
+    SharedPreferences preferences = await SharedPreferences.getInstance();
+    var result = preferences.getStringList('data');
+    userLogin = result![2];
   }
 
   @override
@@ -62,7 +76,7 @@ class _AddJobState extends State<AddJob> {
                   newAgree(),
                   chooseItem(),
                   newAddDate(),
-                  ShowButton(label: 'Add Job to Server', pressFunc: () {}),
+                  newJobButton(),
                 ],
               ),
             ],
@@ -71,6 +85,29 @@ class _AddJobState extends State<AddJob> {
       ),
     );
   }
+
+  ShowButton newJobButton() => ShowButton(
+      label: 'Add Job to Server',
+      pressFunc: () {
+        if (file == null) {
+          MyDialog(context: context)
+              .normalDialog('No picture?', 'Please Take Photo');
+        } else if ((jobName?.isEmpty ?? true) || (detailJob?.isEmpty ?? true)) {
+          MyDialog(context: context)
+              .normalDialog('Have Space', 'Please Fill Job and Detail');
+        } else if (chooseFactoryKey == null) {
+          MyDialog(context: context)
+              .normalDialog('No FactoryKey', 'Please Choose Factory Key');
+        } else if (chooseAgree == null) {
+          MyDialog(context: context)
+              .normalDialog('No Agree', 'Please Choose Yes or No');
+        } else if (checkChooseItem()) {
+          MyDialog(context: context)
+              .normalDialog('No Item', 'Please Choose Item');
+        } else {
+          processUploadAndInsert();
+        }
+      });
 
   Container newAddDate() {
     return Container(
@@ -256,12 +293,18 @@ class _AddJobState extends State<AddJob> {
     return Showform(
         label: 'Detail',
         icondata: Icons.details,
-        changeFunc: (String string) {});
+        changeFunc: (String string) {
+          detailJob = string.trim();
+        });
   }
 
   Showform newJob() {
     return Showform(
-        label: 'Job', icondata: Icons.work, changeFunc: (String string) {});
+        label: 'Job',
+        icondata: Icons.work,
+        changeFunc: (String string) {
+          jobName = string.trim();
+        });
   }
 
   SizedBox newImage() {
@@ -270,9 +313,14 @@ class _AddJobState extends State<AddJob> {
       height: 250,
       child: Stack(
         children: [
-          ShowImage(
-            path: 'images/picture.png',
-          ),
+          file == null
+              ? const ShowImage(
+                  path: 'images/picture.png',
+                )
+              : Image.file(
+                  file!,
+                  fit: BoxFit.cover,
+                ),
           Positioned(
             bottom: 8,
             right: 0,
@@ -310,11 +358,14 @@ class _AddJobState extends State<AddJob> {
                 TextButton(
                     onPressed: () {
                       Navigator.pop(context);
-                      processTakePhoto();
+                      processTakePhoto(imageSource: ImageSource.camera);
                     },
                     child: const Text('Camera')),
                 TextButton(
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: () {
+                      Navigator.pop(context);
+                      processTakePhoto(imageSource: ImageSource.gallery);
+                    },
                     child: const Text('Gallery')),
                 TextButton(
                     onPressed: () => Navigator.pop(context),
@@ -323,5 +374,50 @@ class _AddJobState extends State<AddJob> {
             ));
   }
 
-  void processTakePhoto() {}
+  Future<void> processTakePhoto({required ImageSource imageSource}) async {
+    var result = await ImagePicker().pickImage(
+      source: imageSource,
+      maxWidth: 800,
+      maxHeight: 800,
+    );
+
+    setState(() {
+      file = File(result!.path);
+    });
+  }
+
+  bool checkChooseItem() {
+    bool result = true;
+
+    for (var item in iTemChooses) {
+      if (item) {
+        result = false;
+      }
+    }
+
+    return result;
+  }
+
+  Future<void> processUploadAndInsert() async {
+    String pathUpload = 'https://www.androidthai.in.th/sv/saveFilekaran.php';
+    int code = Random().nextInt(1000000);
+    String nameFile = 'job$code.jpg';
+    print('nameFile ==> $nameFile');
+
+    Map<String, dynamic> map = {};
+    map['file'] = await MultipartFile.fromFile(file!.path, filename: nameFile);
+    FormData formData = FormData.fromMap(map);
+    await Dio().post(pathUpload, data: formData).then((value)  async {
+      String pathImage = 'https://www.androidthai.in.th/sv/pickaran/$nameFile';
+
+      print('pathImage  = $pathImage');
+
+      String qrCode = 'code$code';
+
+      String pathInsert =
+          'https://www.androidthai.in.th/sv/insertJobKaran.php?isAdd=true&nameRecord=$userLogin&jobName=$jobName&detailJob=$detailJob&factoryKey=$chooseFactoryKey&agree=$chooseAgree&item=${iTemChooses.toString()}&addDate=$addDate&qRcode=$qrCode&pathImage=$pathImage';
+
+          await Dio().get(pathInsert).then((value) => Navigator.pop(context));
+    });
+  }
 }
